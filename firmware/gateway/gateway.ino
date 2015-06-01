@@ -29,6 +29,7 @@ int incomingByte = 0;
 String inputString = "0";
 String P181, P182, P170, P270, G;
 int pos181, pos182, pos281, pos282, G_pos, pos170, pos270;
+bool stringComplete = false;
 
 SoftwareSerial mySerial(rxPin, txPin, true); // RX, TX, inverted
 
@@ -45,15 +46,19 @@ void setup () {
 
 
 void loop () { 
-  do {
-    if (mySerial.available()) {
-      incomingByte = mySerial.read();
-      incomingByte &= ~(1 << 7);    // forces 0th bit of x to be 0.  all other bits left alone.
-      inputString += (char)incomingByte;
+  while (mySerial.available()) {
+    incomingByte = mySerial.read();
+    incomingByte &= ~(1 << 7);    // forces 0th bit of x to be 0.  all other bits left alone.
+    // add it to the inputString:
+    inputString += (char)incomingByte;
+    // if the incoming character is a newline, set a flag
+    // so the main loop can do something about it:
+    if ((char)incomingByte == '!') {
+      stringComplete = true;
     }
-  } while (incomingByte != '!');
-  
-   if (inputString.length() > 100) {
+  }
+
+   if (stringComplete) {
       Serial.println(inputString);
 
       pos181 = inputString.indexOf("1-0:1.8.1", 0);
@@ -94,12 +99,12 @@ void loop () {
   }
   
   res = res + 1;
-  
+
   ether.packetLoop(ether.packetReceive());
   
   //200 res = 10 seconds (50ms each res)
   //if (res == 200) {
-  if (inputString != "0") {
+  if (stringComplete) {
     
     byte sd = stash.create();
     stash.print("P181,");
@@ -128,7 +133,7 @@ void loop () {
     Serial.print("RAM: ");
     Serial.println(freeRam()); 
 
-    inputString = "0";
+    stringComplete = false;
   }
   
    const char* reply = ether.tcpReply(session);
@@ -136,8 +141,6 @@ void loop () {
    if (reply != 0) {
      res = 0;
      Serial.println(reply);
-   } else {
-     Serial.println("No response");
    }
    delay(50);
 }
