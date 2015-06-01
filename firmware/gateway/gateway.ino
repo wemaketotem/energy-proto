@@ -26,7 +26,7 @@ int res = 0;
 int incomingByte = 0;
 String inputString = "0";
 String P181, P182, P170, P270, G;
-int pos181, pos182, pos281, pos282, P1_pos, P2_pos, G_pos;
+int pos181, pos182, pos281, pos282, G_pos, pos170, pos270;
 
 SoftwareSerial mySerial(rxPin, txPin, true); // RX, TX, inverted
 
@@ -55,7 +55,7 @@ void loop () {
       pos181 = inputString.indexOf("1-0:1.8.1", 0);
       P181 = inputString.substring(pos181 + 10, pos181 + 17);
 
-      pos182 = inputString.indexOf("1-0:1.8.2", pos181 + 1);
+      pos182 = inputString.indexOf("1-0:1.8.2", 0);
       P182 = inputString.substring(pos182 + 10, pos182 + 17);
 
 //      strMOD += "&field3=";
@@ -66,12 +66,12 @@ void loop () {
 //      pos282 = inputString.indexOf("1-0:2.8.2", pos281 + 1);
 //      strMOD += inputString.substring(pos282 + 10, pos282 + 17);
       
-      P1_pos = inputString.indexOf("1-0:1.7.0", pos282 + 1);
+      pos170 = inputString.indexOf("1-0:1.7.0", 0);
       //strMOD += inputString.substring(P1_pos + 10, P1_pos + 17);
-      P170 = inputString.substring(P1_pos + 10, P1_pos + 17);
+      P170 = inputString.substring(pos170 + 10, pos170 + 17);
       
-      P2_pos = inputString.indexOf("1-0:2.7.0", P1_pos + 1);
-      P270 = inputString.substring(P2_pos + 10, P2_pos + 17);
+      pos270 = inputString.indexOf("1-0:2.7.0", 0);
+      P270 = inputString.substring(pos270 + 10, pos270 + 17);
       
 //      G_pos = inputString.indexOf("(m3)", P2_pos + 1);
 //      G = inputString.substring(G_pos + 7, G_pos + 16);
