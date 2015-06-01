@@ -1,3 +1,5 @@
+#include <SoftwareSerial.h>
+
 #include <EtherCard.h>
 #include <SoftwareSerial.h>
 
@@ -43,18 +45,19 @@ void setup () {
 
 
 void loop () { 
-  while (mySerial.available() > 0) {
-    incomingByte = mySerial.read();
-    incomingByte &= ~(1 << 7);    // forces 0th bit of x to be 0.  all other bits left alone.
-    inputString += (char)incomingByte;
-  }  
+  do {
+    if (mySerial.available()) {
+      incomingByte = mySerial.read();
+      incomingByte &= ~(1 << 7);    // forces 0th bit of x to be 0.  all other bits left alone.
+      inputString += (char)incomingByte;
+    }
+  } while (incomingByte != '!');
   
    if (inputString.length() > 100) {
       Serial.println(inputString);
 
       pos181 = inputString.indexOf("1-0:1.8.1", 0);
       P181 = inputString.substring(pos181 + 10, pos181 + 17);
-
       pos182 = inputString.indexOf("1-0:1.8.2", 0);
       P182 = inputString.substring(pos182 + 10, pos182 + 17);
 
@@ -133,10 +136,13 @@ void loop () {
    if (reply != 0) {
      res = 0;
      Serial.println(reply);
+   } else {
+     Serial.println("No response");
    }
-   
    delay(50);
 }
+
+
 
 
 
