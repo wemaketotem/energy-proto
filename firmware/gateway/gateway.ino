@@ -15,7 +15,7 @@
 // ethernet interface mac address, must be unique on the LAN
 static byte mymac[] = { 0x74,0x69,0x69,0x2D,0x30,0x31 };
 
-const char website[] PROGMEM = "api.xively.com";
+const char website[] PROGMEM = "emoncms.org";
 
 byte Ethernet::buffer[350];
 uint32_t timer;
@@ -107,25 +107,29 @@ void loop () {
   if (stringComplete) {
     
     byte sd = stash.create();
-    stash.print("P181,");
+/*    stash.print("P181,");
     stash.println(P181);
     stash.print("P182,");
     stash.println(P182);
     stash.print("P170,");
     stash.println(P170);
     stash.print("P270,");
-    stash.println(P270);
+    stash.println(P270);*/
 //    stash.print("Gas,");
 //    stash.println(G);
     stash.save();
-
-    Stash::prepare(PSTR("PUT http://$F/v2/feeds/$F.csv HTTP/1.0" "\r\n"
+//http://emoncms.org/input/post.json?json=%7Bpower:34,gas:12%7D&apikey=adc984f0efa3f9d6114b6677c6f08cd3
+    Stash::prepare(PSTR("GET http://emoncms.org/input/post.json?json={power:$S,gas:$S}&apikey=adc984f0efa3f9d6114b6677c6f08cd3 HTTP/1.0" "\r\n"
+      "Host: emoncms.org" "\r\n"
+      "Content-Length: 0" "\r\n"
+      "\r\n"), P181, P182);
+/*    Stash::prepare(PSTR("PUT http://$F/v2/feeds/$F.csv HTTP/1.0" "\r\n"
       "Host: $F" "\r\n"
       "X-PachubeApiKey: $F" "\r\n"
       "Content-Length: $D" "\r\n"
       "\r\n"
       "$H"),
-    website, PSTR(FEED), website, PSTR(APIKEY), stash.size(), sd);
+    website, PSTR(FEED), website, PSTR(APIKEY), stash.size(), sd);*/
 
     // send the packet - this also releases all stash buffers once done
     session = ether.tcpSend();
