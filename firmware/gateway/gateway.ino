@@ -85,7 +85,7 @@ void loop () {
 //      G = inputString.substring(G_pos + 7, G_pos + 16);
       
       Serial.println("\nData:");
-      Serial.println(P181);
+      Serial.println(P181.c_str());
       Serial.println(P182);
       Serial.println(P170);
       Serial.println(P270);
@@ -119,10 +119,10 @@ void loop () {
 //    stash.println(G);
     stash.save();
 //http://emoncms.org/input/post.json?json=%7Bpower:34,gas:12%7D&apikey=adc984f0efa3f9d6114b6677c6f08cd3
-    Stash::prepare(PSTR("GET http://emoncms.org/input/post.json?json={power:$S,gas:$S}&apikey=adc984f0efa3f9d6114b6677c6f08cd3 HTTP/1.0" "\r\n"
+    Stash::prepare(PSTR("GET http://emoncms.org/input/post.json?json={power:$F,gas:$F}&apikey=adc984f0efa3f9d6114b6677c6f08cd3 HTTP/1.0" "\r\n"
       "Host: emoncms.org" "\r\n"
       "Content-Length: 0" "\r\n"
-      "\r\n"), P181, P182);
+      "\r\n"), P181.c_str(), P182.c_str());
 /*    Stash::prepare(PSTR("PUT http://$F/v2/feeds/$F.csv HTTP/1.0" "\r\n"
       "Host: $F" "\r\n"
       "X-PachubeApiKey: $F" "\r\n"
