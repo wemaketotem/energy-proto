@@ -6,7 +6,6 @@
 #define requestPin  6
 #define rxPin       4
 #define txPin       5
-#define BUFSIZE     90
 
 // change these settings to match your own setup
 #define APIKEY "adc984f0efa3f9d6114b6677c6f08cd3" // Robert
@@ -26,10 +25,13 @@ byte session;
 int res = 0;
 
 int incomingByte = 0;
-String inputString = "0";
-String P181, P182, P170, P270, G;
+String inputString = "";
+String P181, P182, P281, P282, P170, P270, G;
 int pos181, pos182, pos281, pos282, G_pos, pos170, pos270;
-bool stringComplete = false;
+bool lineComplete = false;
+bool msgComplete = false;
+bool nextLineIsGas = false;
+bool isSending = false;
 
 SoftwareSerial mySerial(rxPin, txPin, true); // RX, TX, inverted
 
@@ -46,100 +48,141 @@ void setup () {
 
 
 void loop () { 
-  while (mySerial.available()) {
-    incomingByte = mySerial.read();
-    incomingByte &= ~(1 << 7);    // forces 0th bit of x to be 0.  all other bits left alone.
-    // add it to the inputString:
-    inputString += (char)incomingByte;
-    // if the incoming character is a newline, set a flag
-    // so the main loop can do something about it:
-    if ((char)incomingByte == '!') {
-      stringComplete = true;
+  if (!isSending) {
+    while (mySerial.available() && !(lineComplete || msgComplete)) {
+      incomingByte = mySerial.read();
+      incomingByte &= ~(1 << 7);    // forces 0th bit of x to be 0.  all other bits left alone.
+      // add it to the inputString:
+      inputString += (char)incomingByte;
+      // if the incoming character is a newline, set a flag
+      // so the main loop can do something about it:
+      if ((char)incomingByte == '\n') {
+        lineComplete = true;
+      }
+      if ((char)incomingByte == '!') {
+        msgComplete = true;
+      }
     }
-  }
-
-   if (stringComplete) {
-      Serial.println(inputString);
-
-      pos181 = inputString.indexOf("1-0:1.8.1", 0);
-      P181 = inputString.substring(pos181 + 10, pos181 + 17);
-      pos182 = inputString.indexOf("1-0:1.8.2", 0);
-      P182 = inputString.substring(pos182 + 10, pos182 + 17);
-
-//      strMOD += "&field3=";
-//      pos281 = inputString.indexOf("1-0:2.8.1", pos182 + 1);
-//      strMOD += inputString.substring(pos281 + 10, pos281 + 17);
-//      
-//      strMOD += "&field4=";
-//      pos282 = inputString.indexOf("1-0:2.8.2", pos281 + 1);
-//      strMOD += inputString.substring(pos282 + 10, pos282 + 17);
+     if (lineComplete) {
+       if (nextLineIsGas) {
+                   Serial.println("Found gas value");
+         Serial.print("inputString: ");
+         Serial.println(inputString);
+         G = inputString.substring(1, 1+5+1+3);
+       Serial.println(G);    
+         nextLineIsGas = false;
+       } else if (inputString.length() >= 9) { // Only handle lines larger than 9 chars
+         String tag = inputString.substring(0, 9);
+         Serial.print("inputString: ");
+         Serial.println(inputString);
+         Serial.print("tag: ");
+         Serial.println(tag);
+         if (tag == "1-0:1.8.1") {
+            P181 = inputString.substring(10, 10+5+1+3);
+         } else if (tag == "1-0:1.8.2") {
+            P182 = inputString.substring(10, 10+5+1+3);
+         } else if (tag == "1-0:2.8.1") {
+            P281 = inputString.substring(10, 10+5+1+3);
+         } else if (tag == "1-0:2.8.2") {
+            P282 = inputString.substring(10, 10+5+1+3);
+         } else if (tag == "1-0:1.7.0") {
+            P170 = inputString.substring(10, 10+4+1+2);
+         } else if (tag == "1-0:2.7.0") {
+            P270 = inputString.substring(10, 10+4+1+2);
+         } else {
+          G_pos = inputString.indexOf("(m3)");
+          if (G_pos > 0) {
+            nextLineIsGas = true;
+                   Serial.println("Found gas tag");
+          }
+         }
+       }
+       
+       // Line handled, reset for next line
+       inputString = "";
+       lineComplete = false;     
+     } else if (!mySerial.available()) {
+       // When no line and no char available, wait a little to chill the processor
+       delay(50);
+     }
+  } 
+ 
+  if (msgComplete) {
+      Serial.print("181:");    
+      Serial.println(P181);    
+      Serial.print("182:");    
+      Serial.println(P182);    
+      Serial.print("281:");    
+      Serial.println(P281);    
+      Serial.print("282:");    
+      Serial.println(P282);    
+      Serial.print("170:");    
+      Serial.println(P170);    
+      Serial.print("270:");    
+      Serial.println(P270);    
+      Serial.print("gas:");    
+      Serial.println(G);    
+     
+      Serial.print("RAM: ");
+      Serial.println(freeRam()); 
+     
+      // Build the json structure
+      byte sd = stash.create();
+      stash.print("{181:");
+      stash.print(P181);
+      stash.print(",182:");
+      stash.print(P182);
+      stash.print(",281:");
+      stash.print(P281);
+      stash.print(",282:");
+      stash.print(P282);
+      stash.print(",170:");
+      stash.print(P170);
+      stash.print(",270:");
+      stash.print(P270);
+      stash.print(",gas:");
+      stash.print(G);
+      stash.print("}");
+      stash.save();
+      int stash_size = stash.size();
       
-      pos170 = inputString.indexOf("1-0:1.7.0", 0);
-      //strMOD += inputString.substring(P1_pos + 10, P1_pos + 17);
-      P170 = inputString.substring(pos170 + 10, pos170 + 17);
+      // Build the header with json structure in the URL
+      Stash::prepare(PSTR("GET http://$F/input/post.json?json=$H&apikey=$F HTTP/1.0" "\r\n"
+        "Host: $F" "\r\n"
+        "Content-Length: 0" "\r\n"
+        "\r\n"
+        ""), website, sd, PSTR(APIKEY), website);
       
-      pos270 = inputString.indexOf("1-0:2.7.0", 0);
-      P270 = inputString.substring(pos270 + 10, pos270 + 17);
+      // send the packet - this also releases all stash buffers once done
+      session = ether.tcpSend();
+      isSending = true;        
       
-//      G_pos = inputString.indexOf("(m3)", P2_pos + 1);
-//      G = inputString.substring(G_pos + 7, G_pos + 16);
+      // Message handled
+      msgComplete = false;
       
-      Serial.println("\nData:");
-      Serial.println(P181.c_str());
-      Serial.println(P182);
-      Serial.println(P170);
-      Serial.println(P270);
-      Serial.println(G + "\n");
+      Serial.print("RAM: ");
+      Serial.println(freeRam()); 
+   }
+ 
+   if (isSending) {
+     const char* reply = ether.tcpReply(session);
+     
+     if (reply != 0) {
+       res = 0;
+       Serial.println("Respone");
+       Serial.println(reply);
+       isSending = false;
+     } else {
+        //if correct answer is not received then re-initialize ethernet module
+        if (res > 220){
+          initialize_ethernet(); 
+        }
+        res = res + 1;
+        delay(50);
+     }
    }
 
-  
-  //if correct answer is not received then re-initialize ethernet module
-  if (res > 220){
-    initialize_ethernet(); 
-  }
-  
-  res = res + 1;
-
-  ether.packetLoop(ether.packetReceive());
-  
-  //200 res = 10 seconds (50ms each res)
-  //if (res == 200) {
-  if (stringComplete) {
-    
-    // Build the json structure
-    byte sd = stash.create();
-    stash.print("{power:}");
-    stash.print(P181);
-    stash.print(",gas:");
-    stash.print(P182);
-    stash.print("}");
-    stash.save();
-    int stash_size = stash.size();
-
-    // Build the header with json structure in the URL
-    Stash::prepare(PSTR("GET http://$F/input/post.json?json=$H&apikey=$F HTTP/1.0" "\r\n"
-      "Host: $F" "\r\n"
-      "Content-Length: 0" "\r\n"
-      "\r\n"
-      ""), website, sd, PSTR(APIKEY), website);
-
-    // send the packet - this also releases all stash buffers once done
-    session = ether.tcpSend();
-      
-    Serial.print("RAM: ");
-    Serial.println(freeRam()); 
-
-    stringComplete = false;
-  }
-  
-   const char* reply = ether.tcpReply(session);
-   
-   if (reply != 0) {
-     res = 0;
-     Serial.println("Respone");
-     Serial.println(reply);
-   }
-   delay(50);
+   ether.packetLoop(ether.packetReceive()); // Need to be touched continuesly
 }
 
 
@@ -178,8 +221,10 @@ void initialize_ethernet(void){
       //reset init value
       res = 0;
       break;
-    }
+    }    
   }
+    Serial.print("RAM: ");
+    Serial.println(freeRam()); 
 }
 
 int freeRam() {
