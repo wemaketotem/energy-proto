@@ -3,43 +3,43 @@
 #include <EtherCard.h>
 #include <SoftwareSerial.h>
 
-#define requestPin  6
-#define rxPin       4
-#define txPin       5
-#define ledPin      15
+// Define all digital pins used
+#define requestPin  6  // P1 request line
+#define rxPin       4  // P1 UART RX
+#define txPin       5  // Unused TX (is needed for SoftwareSerial)
+#define ledPin      15 // LED
 
-// change these settings to match your own setup
+// Ethernet configuration constants, change these settings to match your own setup
+static byte mymac[] = { 0x74,0x69,0x69,0x2D,0x30,0x31 }; // ethernet interface mac address, must be unique on the LAN
+const char website[] PROGMEM = "emoncms.org";
 #define APIKEY "adc984f0efa3f9d6114b6677c6f08cd3" // Robert
 //#define APIKEY "121ac49b2af30c3c1bd82110dd877c52" // Marten
 
-// ethernet interface mac address, must be unique on the LAN
-static byte mymac[] = { 0x74,0x69,0x69,0x2D,0x30,0x31 };
+// Ethernet variables
+byte Ethernet::buffer[350]; // The buffer used by the Ethernet stack
+Stash stash; // The buffer that contains the POST data
+byte session; // Session identification
+int res = 0; //timing variable for resetting the Ethernet stack
 
-const char website[] PROGMEM = "emoncms.org";
-
-byte Ethernet::buffer[350];
-uint32_t timer;
-Stash stash;
-byte session;
-
-//timing variable
-int res = 0;
-
-int incomingByte = 0;
-String inputString = "";
-String P181, P182, P281, P282, P170, P270, G;
-int pos181, pos182, pos281, pos282, G_pos, pos170, pos270;
-bool lineComplete = false;
-bool msgComplete = false;
-bool nextLineIsGas = false;
-bool isSending = false;
-
+// P1 hardware configuration
 SoftwareSerial mySerial(rxPin, txPin, true); // RX, TX, inverted
 
+// P1 parsing variables
+String inputString = ""; // A string object that will contain one P1 message line
+String P181, P182, P281, P282, P170, P270, G; // The energy value strings cut from the P1 message
+// Flags representing states TODO: Implement real state machine
+bool lineComplete = false; // Indicates that a line of a P1 message is received, need to check the line for value to parse
+bool msgComplete = false; // Indicates that a line of a P1 message is received, parse values can be send
+bool nextLineIsGas = false; // Indicates that the gas tag is found, its value is on the next line
+bool isSending = false; // Busy with sending the last received P1 data
+
+
 void setup () {
+  // Configure debug serial output
   Serial.begin(57600);
   Serial.println("\n[Xively example]");
 
+  // Initialize ethernet, it is blocking until it receives a DHCP lease
   initialize_ethernet();
 
   // Configure P1 port pinning
@@ -62,7 +62,7 @@ void setup () {
 void loop () { 
   if (!isSending) {
     while (mySerial.available() && !(lineComplete || msgComplete)) {
-      incomingByte = mySerial.read();
+      int incomingByte = mySerial.read();
       incomingByte &= ~(1 << 7);    // forces 0th bit of x to be 0.  all other bits left alone.
       // add it to the inputString:
       inputString += (char)incomingByte;
@@ -82,14 +82,11 @@ void loop () {
          Serial.print("inputString: ");
          Serial.println(inputString);
          G = inputString.substring(1, 1+5+1+3);
-       Serial.println(G);    
          nextLineIsGas = false;
        } else if (inputString.length() >= 9) { // Only handle lines larger than 9 chars
          String tag = inputString.substring(0, 9);
          Serial.print("inputString: ");
          Serial.println(inputString);
-         Serial.print("tag: ");
-         Serial.println(tag);
          if (tag == "1-0:1.8.1") {
             digitalWrite(ledPin, LOW); // Set LED to indicate receiving P1 message started (first tag of P1 message is received)
             P181 = inputString.substring(10, 10+5+1+3);
@@ -104,10 +101,9 @@ void loop () {
          } else if (tag == "1-0:2.7.0") {
             P270 = inputString.substring(10, 10+4+1+2);
          } else {
-          G_pos = inputString.indexOf("(m3)");
-          if (G_pos > 0) {
+          if (inputString.indexOf("(m3)") > 0) {
             nextLineIsGas = true;
-                   Serial.println("Found gas tag");
+            Serial.println("Found gas tag");
           }
          }
        }
@@ -229,6 +225,7 @@ void initialize_ethernet(void){
 
     if (!ether.dnsLookup(website)) {
       Serial.println("DNS failed");
+      continue;
     } else {
       ether.printIp("SRV: ", ether.hisip);
   
