@@ -6,6 +6,7 @@
 #define requestPin  6
 #define rxPin       4
 #define txPin       5
+#define ledPin      15
 
 // change these settings to match your own setup
 #define APIKEY "adc984f0efa3f9d6114b6677c6f08cd3" // Robert
@@ -41,9 +42,20 @@ void setup () {
 
   initialize_ethernet();
 
+  // Configure P1 port pinning
   mySerial.begin(9600);
   pinMode(requestPin, OUTPUT);
   digitalWrite(requestPin, HIGH);
+  
+  // Configure LED
+  pinMode(ledPin, OUTPUT);
+  // Let LED pulse 10 times on 10Hz at boot
+  for (int i = 0; i < 10; i++) {
+    digitalWrite(ledPin, LOW);
+    delay(100);
+    digitalWrite(ledPin, HIGH);
+    delay(100);
+  }
 }
 
 
@@ -61,11 +73,12 @@ void loop () {
       }
       if ((char)incomingByte == '!') {
         msgComplete = true;
+        digitalWrite(ledPin, HIGH); // Clear LED to indicate that P1 message receiption completed
       }
     }
      if (lineComplete) {
        if (nextLineIsGas) {
-                   Serial.println("Found gas value");
+         Serial.println("Found gas value");
          Serial.print("inputString: ");
          Serial.println(inputString);
          G = inputString.substring(1, 1+5+1+3);
@@ -78,6 +91,7 @@ void loop () {
          Serial.print("tag: ");
          Serial.println(tag);
          if (tag == "1-0:1.8.1") {
+            digitalWrite(ledPin, LOW); // Set LED to indicate receiving P1 message started (first tag of P1 message is received)
             P181 = inputString.substring(10, 10+5+1+3);
          } else if (tag == "1-0:1.8.2") {
             P182 = inputString.substring(10, 10+5+1+3);
