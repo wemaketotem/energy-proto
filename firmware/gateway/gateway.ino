@@ -57,6 +57,7 @@ void loop () {
       ledOn = !ledOn;
       digitalWrite(ledPin, ledOn); // Toggle LED on each received byte
     }
+    digitalWrite(ledPin, HIGH); // Make sure the led is off when no incomming P1 bytes to handle
  
     ether.packetLoop(ether.packetReceive()); // Need to be touched continuesly
 
