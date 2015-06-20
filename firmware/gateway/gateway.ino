@@ -1,201 +1,144 @@
-#include <SoftwareSerial.h>
-
 #include <EtherCard.h>
 #include <SoftwareSerial.h>
 
-// Define all digital pins used
-#define requestPin  6  // P1 request line
-#define rxPin       4  // P1 UART RX
-#define txPin       5  // Unused TX (is needed for SoftwareSerial)
-#define ledPin      15 // LED
+#define requestPin  6
+#define rxPin       4
+#define txPin       5
+#define BUFSIZE     90
 
-// Ethernet configuration constants, change these settings to match your own setup
-static byte mymac[] = { 0x74,0x69,0x69,0x2D,0x30,0x31 }; // ethernet interface mac address, must be unique on the LAN
-const char website[] PROGMEM = "emoncms.org";
-#define APIKEY "adc984f0efa3f9d6114b6677c6f08cd3" // Robert
-//#define APIKEY "121ac49b2af30c3c1bd82110dd877c52" // Marten
+// change these settings to match your own setup
+//#define FEED "1078132559" // Hans
+//#define APIKEY "TFYXNHXOl9WtfBqryG6b0sR5B1wVwjUzV0ELGHmW0ao84snO" // Hans
+#define FEED "831930262"
+#define APIKEY "Io7klQa8OBF8etrXTlqYGyvOrHHSZtyaaa4KT2USeopZxQJc"
+                
+// ethernet interface mac address, must be unique on the LAN
+static byte mymac[] = { 0x74,0x69,0x69,0x2D,0x30,0x31 };
 
-// Ethernet variables
-byte Ethernet::buffer[350]; // The buffer used by the Ethernet stack
-Stash stash; // The buffer that contains the POST data
-byte session; // Session identification
-int res = 0; //timing variable for resetting the Ethernet stack
+const char website[] PROGMEM = "api.xively.com";
 
-// P1 hardware configuration
+byte Ethernet::buffer[350];
+uint32_t timer;
+Stash stash;
+byte session;
+
+//timing variable
+int res = 0;
+
+int incomingByte = 0;
+String inputString = "0";
+String P181, P182, P170, P270, G;
+int pos181, pos182, pos281, pos282, P1_pos, P2_pos, G_pos;
+
 SoftwareSerial mySerial(rxPin, txPin, true); // RX, TX, inverted
 
-// P1 parsing variables
-String inputString = ""; // A string object that will contain one P1 message line
-String P181, P182, P281, P282, P170, P270, G; // The energy value strings cut from the P1 message
-// Flags representing states TODO: Implement real state machine
-bool lineComplete = false; // Indicates that a line of a P1 message is received, need to check the line for value to parse
-bool msgComplete = false; // Indicates that a line of a P1 message is received, parse values can be send
-bool nextLineIsGas = false; // Indicates that the gas tag is found, its value is on the next line
-bool isSending = false; // Busy with sending the last received P1 data
-
-
 void setup () {
-  // Configure debug serial output
   Serial.begin(57600);
   Serial.println("\n[Xively example]");
 
-  // Initialize ethernet, it is blocking until it receives a DHCP lease
   initialize_ethernet();
 
-  // Configure P1 port pinning
   mySerial.begin(9600);
   pinMode(requestPin, OUTPUT);
   digitalWrite(requestPin, HIGH);
-  
-  // Configure LED
-  pinMode(ledPin, OUTPUT);
-  // Let LED pulse 10 times on 10Hz at boot
-  for (int i = 0; i < 10; i++) {
-    digitalWrite(ledPin, LOW);
-    delay(100);
-    digitalWrite(ledPin, HIGH);
-    delay(100);
-  }
 }
 
 
 void loop () { 
-  if (!isSending) {
-    while (mySerial.available() && !(lineComplete || msgComplete)) {
-      int incomingByte = mySerial.read();
-      incomingByte &= ~(1 << 7);    // forces 0th bit of x to be 0.  all other bits left alone.
-      // add it to the inputString:
-      inputString += (char)incomingByte;
-      // if the incoming character is a newline, set a flag
-      // so the main loop can do something about it:
-      if ((char)incomingByte == '\n') {
-        lineComplete = true;
-      }
-      if ((char)incomingByte == '!') {
-        msgComplete = true;
-        digitalWrite(ledPin, HIGH); // Clear LED to indicate that P1 message receiption completed
-      }
-    }
-     if (lineComplete) {
-       if (nextLineIsGas) {
-         Serial.println("Found gas value");
-         Serial.print("inputString: ");
-         Serial.println(inputString);
-         G = inputString.substring(1, 1+5+1+3);
-         nextLineIsGas = false;
-       } else if (inputString.length() >= 9) { // Only handle lines larger than 9 chars
-         String tag = inputString.substring(0, 9);
-         Serial.print("inputString: ");
-         Serial.println(inputString);
-         if (tag == "1-0:1.8.1") {
-            digitalWrite(ledPin, LOW); // Set LED to indicate receiving P1 message started (first tag of P1 message is received)
-            P181 = inputString.substring(10, 10+5+1+3);
-         } else if (tag == "1-0:1.8.2") {
-            P182 = inputString.substring(10, 10+5+1+3);
-         } else if (tag == "1-0:2.8.1") {
-            P281 = inputString.substring(10, 10+5+1+3);
-         } else if (tag == "1-0:2.8.2") {
-            P282 = inputString.substring(10, 10+5+1+3);
-         } else if (tag == "1-0:1.7.0") {
-            P170 = inputString.substring(10, 10+4+1+2);
-         } else if (tag == "1-0:2.7.0") {
-            P270 = inputString.substring(10, 10+4+1+2);
-         } else {
-          if (inputString.indexOf("(m3)") > 0) {
-            nextLineIsGas = true;
-            Serial.println("Found gas tag");
-          }
-         }
-       }
-       
-       // Line handled, reset for next line
-       inputString = "";
-       lineComplete = false;     
-     } else if (!mySerial.available()) {
-       // When no line and no char available, wait a little to chill the processor
-       delay(50);
-     }
-  } 
- 
-  if (msgComplete) {
-      Serial.print("181:");    
-      Serial.println(P181);    
-      Serial.print("182:");    
-      Serial.println(P182);    
-      Serial.print("281:");    
-      Serial.println(P281);    
-      Serial.print("282:");    
-      Serial.println(P282);    
-      Serial.print("170:");    
-      Serial.println(P170);    
-      Serial.print("270:");    
-      Serial.println(P270);    
-      Serial.print("gas:");    
-      Serial.println(G);    
-     
-      Serial.print("RAM: ");
-      Serial.println(freeRam()); 
-     
-      // Build the json structure
-      byte sd = stash.create();
-      stash.print("{181:");
-      stash.print(P181);
-      stash.print(",182:");
-      stash.print(P182);
-      stash.print(",281:");
-      stash.print(P281);
-      stash.print(",282:");
-      stash.print(P282);
-      stash.print(",170:");
-      stash.print(P170);
-      stash.print(",270:");
-      stash.print(P270);
-      stash.print(",gas:");
-      stash.print(G);
-      stash.print("}");
-      stash.save();
-      int stash_size = stash.size();
+  while (mySerial.available() > 0) {
+    incomingByte = mySerial.read();
+    incomingByte &= ~(1 << 7);    // forces 0th bit of x to be 0.  all other bits left alone.
+    inputString += (char)incomingByte;
+  }  
+  
+   if (inputString.length() > 100) {
+      Serial.println(inputString);
+
+      pos181 = inputString.indexOf("1-0:1.8.1", 0);
+      P181 = inputString.substring(pos181 + 10, pos181 + 17);
+
+      pos182 = inputString.indexOf("1-0:1.8.2", pos181 + 1);
+      P182 = inputString.substring(pos182 + 10, pos182 + 17);
+
+//      strMOD += "&field3=";
+//      pos281 = inputString.indexOf("1-0:2.8.1", pos182 + 1);
+//      strMOD += inputString.substring(pos281 + 10, pos281 + 17);
+//      
+//      strMOD += "&field4=";
+//      pos282 = inputString.indexOf("1-0:2.8.2", pos281 + 1);
+//      strMOD += inputString.substring(pos282 + 10, pos282 + 17);
       
-      // Build the header with json structure in the URL
-      Stash::prepare(PSTR("GET http://$F/input/post.json?json=$H&apikey=$F HTTP/1.0" "\r\n"
-        "Host: $F" "\r\n"
-        "Content-Length: 0" "\r\n"
-        "\r\n"
-        ""), website, sd, PSTR(APIKEY), website);
+      P1_pos = inputString.indexOf("1-0:1.7.0", pos282 + 1);
+      //strMOD += inputString.substring(P1_pos + 10, P1_pos + 17);
+      P170 = inputString.substring(P1_pos + 10, P1_pos + 17);
       
-      // send the packet - this also releases all stash buffers once done
-      session = ether.tcpSend();
-      isSending = true;        
+      P2_pos = inputString.indexOf("1-0:2.7.0", P1_pos + 1);
+      P270 = inputString.substring(P2_pos + 10, P2_pos + 17);
       
-      // Message handled
-      msgComplete = false;
+//      G_pos = inputString.indexOf("(m3)", P2_pos + 1);
+//      G = inputString.substring(G_pos + 7, G_pos + 16);
       
-      Serial.print("RAM: ");
-      Serial.println(freeRam()); 
-   }
- 
-   if (isSending) {
-     const char* reply = ether.tcpReply(session);
-     
-     if (reply != 0) {
-       res = 0;
-       Serial.println("Respone");
-       Serial.println(reply);
-       isSending = false;
-     } else {
-        //if correct answer is not received then re-initialize ethernet module
-        if (res > 220){
-          initialize_ethernet(); 
-        }
-        res = res + 1;
-        delay(50);
-     }
+      Serial.println("\nData:");
+      Serial.println(P181);
+      Serial.println(P182);
+      Serial.println(P170);
+      Serial.println(P270);
+      Serial.println(G + "\n");
    }
 
-   ether.packetLoop(ether.packetReceive()); // Need to be touched continuesly
+  
+  //if correct answer is not received then re-initialize ethernet module
+  if (res > 220){
+    initialize_ethernet(); 
+  }
+  
+  res = res + 1;
+  
+  ether.packetLoop(ether.packetReceive());
+  
+  //200 res = 10 seconds (50ms each res)
+  //if (res == 200) {
+  if (inputString != "0") {
+    
+    byte sd = stash.create();
+    stash.print("P181,");
+    stash.println(P181);
+    stash.print("P182,");
+    stash.println(P182);
+    stash.print("P170,");
+    stash.println(P170);
+    stash.print("P270,");
+    stash.println(P270);
+//    stash.print("Gas,");
+//    stash.println(G);
+    stash.save();
+
+    Stash::prepare(PSTR("PUT http://$F/v2/feeds/$F.csv HTTP/1.0" "\r\n"
+      "Host: $F" "\r\n"
+      "X-PachubeApiKey: $F" "\r\n"
+      "Content-Length: $D" "\r\n"
+      "\r\n"
+      "$H"),
+    website, PSTR(FEED), website, PSTR(APIKEY), stash.size(), sd);
+
+    // send the packet - this also releases all stash buffers once done
+    session = ether.tcpSend();
+      
+    Serial.print("RAM: ");
+    Serial.println(freeRam()); 
+
+    inputString = "0";
+  }
+  
+   const char* reply = ether.tcpReply(session);
+   
+   if (reply != 0) {
+     res = 0;
+     Serial.println(reply);
+   }
+   
+   delay(50);
 }
-
-
 
 
 
@@ -223,19 +166,15 @@ void initialize_ethernet(void){
     ether.printIp("GW:  ", ether.gwip);  
     ether.printIp("DNS: ", ether.dnsip);  
 
-    if (!ether.dnsLookup(website)) {
+    if (!ether.dnsLookup(website))
       Serial.println("DNS failed");
-      continue;
-    } else {
-      ether.printIp("SRV: ", ether.hisip);
-  
-      //reset init value
-      res = 0;
-      break;
-    }    
+
+    ether.printIp("SRV: ", ether.hisip);
+
+    //reset init value
+    res = 0;
+    break;
   }
-    Serial.print("RAM: ");
-    Serial.println(freeRam()); 
 }
 
 int freeRam() {
