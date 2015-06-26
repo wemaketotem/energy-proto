@@ -1,3 +1,5 @@
+// V2: Three iso one decimals; Changed Cosm account; Don't send when invalid data; Potential fix for hanging (stash)
+
 #include <EtherCard.h>
 #include <SoftwareSerial.h>
 
@@ -7,11 +9,9 @@
 #define BUFSIZE     90
 
 // change these settings to match your own setup
-//#define FEED "1078132559" // Hans
-//#define APIKEY "TFYXNHXOl9WtfBqryG6b0sR5B1wVwjUzV0ELGHmW0ao84snO" // Hans
 #define FEED "831930262"
 #define APIKEY "Io7klQa8OBF8etrXTlqYGyvOrHHSZtyaaa4KT2USeopZxQJc"
-                
+
 // ethernet interface mac address, must be unique on the LAN
 static byte mymac[] = { 0x74,0x69,0x69,0x2D,0x30,0x31 };
 
@@ -29,6 +29,7 @@ int incomingByte = 0;
 String inputString = "0";
 String P181, P182, P170, P270, G;
 int pos181, pos182, pos281, pos282, P1_pos, P2_pos, G_pos;
+int valid = 0;
 
 SoftwareSerial mySerial(rxPin, txPin, true); // RX, TX, inverted
 
@@ -52,40 +53,47 @@ void loop () {
   }  
   
    if (inputString.length() > 100) {
+      valid = 1;
       Serial.println(inputString);
 
       pos181 = inputString.indexOf("1-0:1.8.1", 0);
-      P181 = inputString.substring(pos181 + 10, pos181 + 17);
+      P181 = inputString.substring(pos181 + 10, pos181 + 19);
+      if(P181.indexOf(".") == -1)
+        valid = 0;
 
       pos182 = inputString.indexOf("1-0:1.8.2", pos181 + 1);
-      P182 = inputString.substring(pos182 + 10, pos182 + 17);
+      P182 = inputString.substring(pos182 + 10, pos182 + 19);
+      if(P182.indexOf(".") == -1)
+        valid = 0;
 
-//      strMOD += "&field3=";
 //      pos281 = inputString.indexOf("1-0:2.8.1", pos182 + 1);
 //      strMOD += inputString.substring(pos281 + 10, pos281 + 17);
-//      
-//      strMOD += "&field4=";
 //      pos282 = inputString.indexOf("1-0:2.8.2", pos281 + 1);
 //      strMOD += inputString.substring(pos282 + 10, pos282 + 17);
       
       P1_pos = inputString.indexOf("1-0:1.7.0", pos282 + 1);
-      //strMOD += inputString.substring(P1_pos + 10, P1_pos + 17);
       P170 = inputString.substring(P1_pos + 10, P1_pos + 17);
+      if(P170.indexOf(".") == -1)
+        valid = 0;
       
       P2_pos = inputString.indexOf("1-0:2.7.0", P1_pos + 1);
       P270 = inputString.substring(P2_pos + 10, P2_pos + 17);
-      
+      if(P270.indexOf(".") == -1)
+        valid = 0;
+
 //      G_pos = inputString.indexOf("(m3)", P2_pos + 1);
 //      G = inputString.substring(G_pos + 7, G_pos + 16);
-      
+        
       Serial.println("\nData:");
       Serial.println(P181);
       Serial.println(P182);
       Serial.println(P170);
       Serial.println(P270);
-      Serial.println(G + "\n");
-   }
+      //Serial.println(G + "\n");
 
+      if(valid == 0)
+        Serial.println("=> Invalid");
+   }
   
   //if correct answer is not received then re-initialize ethernet module
   if (res > 220){
@@ -98,8 +106,11 @@ void loop () {
   
   //200 res = 10 seconds (50ms each res)
   //if (res == 200) {
-  if (inputString != "0") {
+  if (inputString != "0" && valid == 0)
+    inputString = "0";  
     
+  if (inputString != "0") {
+    //stash.cleanup();
     byte sd = stash.create();
     stash.print("P181,");
     stash.println(P181);
@@ -136,6 +147,10 @@ void loop () {
      res = 0;
      Serial.println(reply);
    }
+
+//  if (stash.freeCount() <= 3) {
+//    Stash::initMap(56);
+//  }
    
    delay(50);
 }
