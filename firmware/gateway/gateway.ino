@@ -37,7 +37,7 @@ bool isSending = false; // Busy with sending the last received P1 data
 void setup () {
   // Configure debug serial output
   Serial.begin(57600);
-  Serial.println("\n[Xively example]");
+  Serial.println("\n[EmonCMS example]");
 
   // Initialize ethernet, it is blocking until it receives a DHCP lease
   initialize_ethernet();
