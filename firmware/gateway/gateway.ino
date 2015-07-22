@@ -1,5 +1,7 @@
 #include <SPI.h>
+#include <HttpClient.h>
 #include <Ethernet.h>
+#include <EthernetClient.h>
 #include <SoftwareSerial.h>
 
 // Define all digital pins used
@@ -15,13 +17,10 @@ static byte mymac[] = { 0x74,0x69,0x69,0x2D,0x30,0x31 }; // ethernet interface m
 #define APIKEY "adc984f0efa3f9d6114b6677c6f08cd3" // Robert
 //#define APIKEY "121ac49b2af30c3c1bd82110dd877c52" // Marten
 
-// Ethernet variables
-//byte Ethernet::buffer[350]; // The buffer used by the Ethernet stack
-//Stash stash; // The buffer that contains the POST data
-//byte session; // Session identification
-//int res = 0; //timing variable for resetting the Ethernet stack
-// initialize the library instance:
-EthernetClient client;
+// Number of milliseconds to wait without receiving any data before we give up
+const int kNetworkTimeout = 30*1000;
+// Number of milliseconds to wait if no data is available before trying again
+const int kNetworkDelay = 1000;
 
 // P1 hardware configuration
 SoftwareSerial mySerial(rxPin, txPin, false); // RX, TX, inverted
@@ -32,7 +31,6 @@ String P181, P182, P281, P282, P170, P270, G; // The energy value strings cut fr
 bool lineComplete = false; // Indicates that a line of a P1 message is received, need to check the line for value to parse
 bool msgComplete = false; // Indicates that a line of a P1 message is received, parse values can be send
 bool nextLineIsGas = false; // Indicates that the gas tag is found, its value is on the next line
-bool isSending = false; // Busy with sending the last received P1 data
 
 
 void setup () {
@@ -61,119 +59,91 @@ void setup () {
 
 
 void loop () { 
-  if (!isSending) {
-    while (mySerial.available() && !(lineComplete || msgComplete)) {
-      int incomingByte = mySerial.read();
-      incomingByte &= ~(1 << 7);    // forces 0th bit of x to be 0.  all other bits left alone.
-      // add it to the inputString:
-      inputString += (char)incomingByte;
-      // if the incoming character is a newline, set a flag
-      // so the main loop can do something about it:
-      if ((char)incomingByte == '\n') {
-        lineComplete = true;
-      }
-      if ((char)incomingByte == '!') {
-        msgComplete = true;
-        digitalWrite(ledPin, HIGH); // Clear LED to indicate that P1 message receiption completed
+  while (mySerial.available() && !(lineComplete || msgComplete)) {
+    int incomingByte = mySerial.read();
+    incomingByte &= ~(1 << 7);    // forces 0th bit of x to be 0.  all other bits left alone.
+    // add it to the inputString:
+    inputString += (char)incomingByte;
+    // if the incoming character is a newline, set a flag
+    // so the main loop can do something about it:
+    if ((char)incomingByte == '\n') {
+      lineComplete = true;
+    }
+    if ((char)incomingByte == '!') {
+      msgComplete = true;
+      digitalWrite(ledPin, HIGH); // Clear LED to indicate that P1 message receiption completed
+    }
+  }
+  if (lineComplete) {
+    if (nextLineIsGas) {
+      Serial.println("Found gas value");
+      Serial.print("inputString: ");
+      Serial.println(inputString);
+      G = inputString.substring(1, 1+5+1+3);
+      nextLineIsGas = false;
+    } else if (inputString.length() >= 9) { // Only handle lines larger than 9 chars
+      String tag = inputString.substring(0, 9);
+      Serial.print("inputString: ");
+      Serial.println(inputString);
+      if (tag == "1-0:1.8.1") {
+        digitalWrite(ledPin, LOW); // Set LED to indicate receiving P1 message started (first tag of P1 message is received)
+        P181 = inputString.substring(10, 10+5+1+3);
+      } else if (tag == "1-0:1.8.2") {
+        P182 = inputString.substring(10, 10+5+1+3);
+      } else if (tag == "1-0:2.8.1") {
+        P281 = inputString.substring(10, 10+5+1+3);
+      } else if (tag == "1-0:2.8.2") {
+        P282 = inputString.substring(10, 10+5+1+3);
+      } else if (tag == "1-0:1.7.0") {
+        P170 = inputString.substring(10, 10+4+1+2);
+      } else if (tag == "1-0:2.7.0") {
+        P270 = inputString.substring(10, 10+4+1+2);
+      } else {
+        if (inputString.indexOf("(m3)") > 0) {
+          nextLineIsGas = true;
+          Serial.println("Found gas tag");
+        }
       }
     }
-     if (lineComplete) {
-       if (nextLineIsGas) {
-         Serial.println("Found gas value");
-         Serial.print("inputString: ");
-         Serial.println(inputString);
-         G = inputString.substring(1, 1+5+1+3);
-         nextLineIsGas = false;
-       } else if (inputString.length() >= 9) { // Only handle lines larger than 9 chars
-         String tag = inputString.substring(0, 9);
-         Serial.print("inputString: ");
-         Serial.println(inputString);
-         if (tag == "1-0:1.8.1") {
-            digitalWrite(ledPin, LOW); // Set LED to indicate receiving P1 message started (first tag of P1 message is received)
-            P181 = inputString.substring(10, 10+5+1+3);
-         } else if (tag == "1-0:1.8.2") {
-            P182 = inputString.substring(10, 10+5+1+3);
-         } else if (tag == "1-0:2.8.1") {
-            P281 = inputString.substring(10, 10+5+1+3);
-         } else if (tag == "1-0:2.8.2") {
-            P282 = inputString.substring(10, 10+5+1+3);
-         } else if (tag == "1-0:1.7.0") {
-            P170 = inputString.substring(10, 10+4+1+2);
-         } else if (tag == "1-0:2.7.0") {
-            P270 = inputString.substring(10, 10+4+1+2);
-         } else {
-          if (inputString.indexOf("(m3)") > 0) {
-            nextLineIsGas = true;
-            Serial.println("Found gas tag");
-          }
-         }
-       }
-       
-       // Line handled, reset for next line
-       inputString = "";
-       lineComplete = false;     
-     } else if (!mySerial.available()) {
-       // When no line and no char available, wait a little to chill the processor
-       delay(50);
-     }
-  } 
+     
+    // Line handled, reset for next line
+    inputString = "";
+    lineComplete = false;     
+  } else if (!mySerial.available()) {
+    // When no line and no char available, wait a little to chill the processor
+    delay(50);
+  }
  
   if (msgComplete) {
-      Serial.print("181:");    
-      Serial.println(P181);    
-      Serial.print("182:");    
-      Serial.println(P182);    
-      Serial.print("281:");    
-      Serial.println(P281);    
-      Serial.print("282:");    
-      Serial.println(P282);    
-      Serial.print("170:");    
-      Serial.println(P170);    
-      Serial.print("270:");    
-      Serial.println(P270);    
-      Serial.print("gas:");    
-      Serial.println(G);    
-     
-      Serial.print("RAM: ");
-      Serial.println(freeRam()); 
+    Serial.print("181:");    
+    Serial.println(P181);    
+    Serial.print("182:");    
+    Serial.println(P182);    
+    Serial.print("281:");    
+    Serial.println(P281);    
+    Serial.print("282:");    
+    Serial.println(P282);    
+    Serial.print("170:");    
+    Serial.println(P170);    
+    Serial.print("270:");    
+    Serial.println(P270);    
+    Serial.print("gas:");    
+    Serial.println(G);    
+   
+    Serial.print("RAM: ");
+    Serial.println(freeRam()); 
 
-      if (buildAndSendRequest()) {
-        isSending = true;        
-      } else {
-        // Failed to send, re-initialize ethernet
-        initialize_ethernet();
-      }
+    if (!buildAndSendRequest()) {
+      // Failed to send, re-initialize ethernet
+      initialize_ethernet();
+    }
+    
+    // Message handled
+    msgComplete = false;
       
-      // Message handled
-      msgComplete = false;
-      
-      Serial.print("RAM: ");
-      Serial.println(freeRam()); 
-   }
- 
-  if (isSending) {
-    checkForAnswer();
-    delay(5000);
-    isSending = false;
+    Serial.print("RAM: ");
+    Serial.println(freeRam()); 
   }
-//     const char* reply = ether.tcpReply(session);
-//     
-//     if (reply != 0) {
-//       res = 0;
-//       Serial.println("Respone");
-//       Serial.println(reply);
-//       isSending = false;
-//     } else {
-//        //if correct answer is not received then re-initialize ethernet module
-//        if (res > 220){
-//          initialize_ethernet(); 
-//        }
-//        res = res + 1;
-//        delay(50);
-//     }
-//   }
-//
-//   ether.packetLoop(ether.packetReceive()); // Need to be touched continuesly
   Ethernet.maintain();
 }
 
@@ -191,97 +161,91 @@ void initialize_ethernet(void){
 }
 
 bool buildAndSendRequest(void) {
-  if (client.connect(HOST, 80)) {
-    // if there's a successful connection:
-    Serial.println("connecting...");
-    // send the HTTP PUT request:
-    client.print("GET http://" HOST "/input/post.json?json=");
-        // The JSON containing the meter readings as part of the URL
-        client.print("{181:");
-        client.print(P181);
-        client.print(",182:");
-        client.print(P182);
-        client.print(",281:");
-        client.print(P281);
-        client.print(",282:");
-        client.print(P282);
-        client.print(",170:");
-        client.print(P170);
-        client.print(",270:");
-        client.print(P270);
-        client.print(",gas:");
-        client.print(G);
-    client.println("&apikey=" APIKEY " HTTP/1.0");
-    client.println("Host: " HOST);
-    client.println("Content-Length: 0");
-    client.println();
-    return true;
-    
-  }
-  else {
-    // if you couldn't make a connection:
-    Serial.println("connection failed");
-    Serial.println("disconnecting.");
-    client.stop();
-    
-    return false;
-  }
-//     
-//      // Build the json structure
-//      byte sd = stash.create();
-//      stash.print("{181:");
-//      stash.print(P181);
-//      stash.print(",182:");
-//      stash.print(P182);
-//      stash.print(",281:");
-//      stash.print(P281);
-//      stash.print(",282:");
-//      stash.print(P282);
-//      stash.print(",170:");
-//      stash.print(P170);
-//      stash.print(",270:");
-//      stash.print(P270);
-//      stash.print(",gas:");
-//      stash.print(G);
-//      stash.print("}");
-//      stash.save();
-//      int stash_size = stash.size();
-//      
-//      // Build the header with json structure in the URL
-//      Stash::prepare(PSTR("GET http://$F/input/post.json?json=$H&apikey=$F HTTP/1.0" "\r\n"
-//        "Host: $F" "\r\n"
-//        "Content-Length: 0" "\r\n"
-//        "\r\n"
-//        ""), website, sd, PSTR(APIKEY), website);
-//      
-//      // send the packet - this also releases all stash buffers once done
-//      session = ether.tcpSend();
-//      isSending = true;    
-}
+  int err =0;
+  String url = "/input/post.json?json=";
+  url += "{181:";
+  url += P181;
+  url += ",182:";
+  url += P182;
+  url += ",281:";
+  url += P281;
+  url += ",282:";
+  url += P282;
+  url += ",170:";
+  url += P170;
+  url += ",270:";
+  url += P270;
+  url += ",gas:";
+  url += G;
+  url += "}";
+  url += "}&apikey=" APIKEY;
 
-bool checkForAnswer(void) {
-//  static enum {
-//    RECEIVING_HEADER,
-//    REACHED_EOL,
-//    REACHED_EOH
-//  } state = RECEIVING_HEADER;
-//  
-//  while (client.available()) {
-//    int c = client.read()
-//    if (c == '\n') {
-//      switch (state) {
-//        case RECEIVING_HEADER:
-//          state = REACHED_EOL;
-//          break;
-//        case REACHED_EOL:
-//          state = REACHED_EOF;
-//          break;
-//        case REACHED_EOF:
-//          break;
-//      }
-//    }
-//    
-//  }
+  EthernetClient c;
+  HttpClient http(c);
+  err = http.get(HOST, url.c_str());
+  if (err == 0)
+  {
+    Serial.println("startedRequest ok");
+    err = http.responseStatusCode();
+    if (err >= 0)
+    {
+      Serial.print("Got status code: ");
+      Serial.println(err);
+      // Usually you'd check that the response code is 200 or a
+      // similar "success" code (200-299) before carrying on,
+      // but we'll print out whatever response we get
+      err = http.skipResponseHeaders();
+      if (err >= 0)
+      {
+        int bodyLen = http.contentLength();
+        Serial.print("Content length is: ");
+        Serial.println(bodyLen);
+        Serial.println();
+        Serial.println("Body returned follows:");
+        // Now we've got to the body, so we can print it out
+        unsigned long timeoutStart = millis();
+        char c;
+        // Whilst we haven't timed out & haven't reached the end of the body
+        while ( (http.connected() || http.available()) &&
+        ((millis() - timeoutStart) < kNetworkTimeout) )
+        {
+          if (http.available())
+          {
+            c = http.read();
+            // Print out this character
+            Serial.print(c);
+            bodyLen--;
+            // We read something, reset the timeout counter
+            timeoutStart = millis();
+          }
+          else
+          {
+            // We haven't got any data, so let's pause to allow some to
+            // arrive
+            delay(kNetworkDelay);
+          }
+        }
+        Serial.println();
+      }
+      else
+      {
+        Serial.print("Failed to skip response headers: ");
+        Serial.println(err);
+      }
+    }
+    else
+    {
+      Serial.print("Getting response failed: ");
+      Serial.println(err);
+    }
+  }
+  else
+  {
+    Serial.print("Connect failed: ");
+    Serial.println(err);
+  }
+
+  return err == 0;
 }
 
 int freeRam() {
