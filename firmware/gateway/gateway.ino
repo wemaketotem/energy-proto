@@ -1,5 +1,7 @@
-#include <EtherCard.h>
+#include <SPI.h>
+#include <Ethernet.h>
 #include <SoftwareSerial.h>
+
 // Define all digital pins used
 #define requestPin  6  // P1 request line
 #define rxPin       7  // P1 UART RX
@@ -8,18 +10,21 @@
 
 // Ethernet configuration constants, change these settings to match your own setup
 static byte mymac[] = { 0x74,0x69,0x69,0x2D,0x30,0x31 }; // ethernet interface mac address, must be unique on the LAN
-const char website[] PROGMEM = "emoncms.org";
+#define HOST "emoncms.org"
+//#define HOST "192.168.2.3"
 #define APIKEY "adc984f0efa3f9d6114b6677c6f08cd3" // Robert
 //#define APIKEY "121ac49b2af30c3c1bd82110dd877c52" // Marten
 
 // Ethernet variables
-byte Ethernet::buffer[350]; // The buffer used by the Ethernet stack
-Stash stash; // The buffer that contains the POST data
-byte session; // Session identification
-int res = 0; //timing variable for resetting the Ethernet stack
+//byte Ethernet::buffer[350]; // The buffer used by the Ethernet stack
+//Stash stash; // The buffer that contains the POST data
+//byte session; // Session identification
+//int res = 0; //timing variable for resetting the Ethernet stack
+// initialize the library instance:
+EthernetClient client;
 
 // P1 hardware configuration
-SoftwareSerial mySerial(rxPin, txPin, true); // RX, TX, inverted
+SoftwareSerial mySerial(rxPin, txPin, false); // RX, TX, inverted
 // P1 parsing variables
 String inputString = ""; // A string object that will contain one P1 message line
 String P181, P182, P281, P282, P170, P270, G; // The energy value strings cut from the P1 message
@@ -36,7 +41,7 @@ void setup () {
   Serial.println("\n[EmonCMS example]");
 
   // Initialize ethernet, it is blocking until it receives a DHCP lease
-//  initialize_ethernet();
+  initialize_ethernet();
 
   // Configure P1 port pinning
   mySerial.begin(9600);
@@ -131,6 +136,96 @@ void loop () {
      
       Serial.print("RAM: ");
       Serial.println(freeRam()); 
+
+      if (buildAndSendRequest()) {
+        isSending = true;        
+      } else {
+        // Failed to send, re-initialize ethernet
+        initialize_ethernet();
+      }
+      
+      // Message handled
+      msgComplete = false;
+      
+      Serial.print("RAM: ");
+      Serial.println(freeRam()); 
+   }
+ 
+  if (isSending) {
+    checkForAnswer();
+    delay(5000);
+    isSending = false;
+  }
+//     const char* reply = ether.tcpReply(session);
+//     
+//     if (reply != 0) {
+//       res = 0;
+//       Serial.println("Respone");
+//       Serial.println(reply);
+//       isSending = false;
+//     } else {
+//        //if correct answer is not received then re-initialize ethernet module
+//        if (res > 220){
+//          initialize_ethernet(); 
+//        }
+//        res = res + 1;
+//        delay(50);
+//     }
+//   }
+//
+//   ether.packetLoop(ether.packetReceive()); // Need to be touched continuesly
+  Ethernet.maintain();
+}
+
+
+void initialize_ethernet(void){  
+  while (!Ethernet.begin(mymac)) {
+    // failed to get a DHCP response, try to recover later
+    Serial.print("failed to get a DHCP response, try to recover after one second");
+    delay(1000);
+  }
+  
+  // DHCP received, get DNS
+  Serial.print("Received IP from DHCP server:");
+  Serial.println(Ethernet.localIP());
+}
+
+bool buildAndSendRequest(void) {
+  if (client.connect(HOST, 80)) {
+    // if there's a successful connection:
+    Serial.println("connecting...");
+    // send the HTTP PUT request:
+    client.print("GET http://" HOST "/input/post.json?json=");
+        // The JSON containing the meter readings as part of the URL
+        client.print("{181:");
+        client.print(P181);
+        client.print(",182:");
+        client.print(P182);
+        client.print(",281:");
+        client.print(P281);
+        client.print(",282:");
+        client.print(P282);
+        client.print(",170:");
+        client.print(P170);
+        client.print(",270:");
+        client.print(P270);
+        client.print(",gas:");
+        client.print(G);
+    client.println("&apikey=" APIKEY " HTTP/1.0");
+    client.println("Host: " HOST);
+    client.println("Content-Length: 0");
+    client.println();
+    return true;
+    
+  }
+  else {
+    // if you couldn't make a connection:
+    Serial.println("connection failed");
+    Serial.println("disconnecting.");
+    client.stop();
+    
+    return false;
+  }
 //     
 //      // Build the json structure
 //      byte sd = stash.create();
@@ -161,75 +256,33 @@ void loop () {
 //      
 //      // send the packet - this also releases all stash buffers once done
 //      session = ether.tcpSend();
-//      isSending = true;        
-      
-      // Message handled
-      msgComplete = false;
-      
-      Serial.print("RAM: ");
-      Serial.println(freeRam()); 
-   }
- 
-//   if (isSending) {
-//     const char* reply = ether.tcpReply(session);
-//     
-//     if (reply != 0) {
-//       res = 0;
-//       Serial.println("Respone");
-//       Serial.println(reply);
-//       isSending = false;
-//     } else {
-//        //if correct answer is not received then re-initialize ethernet module
-//        if (res > 220){
-//          initialize_ethernet(); 
-//        }
-//        res = res + 1;
-//        delay(50);
-//     }
-//   }
-//
-//   ether.packetLoop(ether.packetReceive()); // Need to be touched continuesly
+//      isSending = true;    
 }
 
-//
-//void initialize_ethernet(void){  
-//  for(;;){ // keep trying until you succeed 
-//    //Reinitialize ethernet module
-//    pinMode(5, OUTPUT);
-//    Serial.println("Reseting Ethernet...");
-//    digitalWrite(5, LOW);
-//    delay(1000);
-//    digitalWrite(5, HIGH);
-//    delay(500);
-//
-//    if (ether.begin(sizeof Ethernet::buffer, mymac) == 0){ 
-//      Serial.println( "Failed to access Ethernet controller");
-//      continue;
+bool checkForAnswer(void) {
+//  static enum {
+//    RECEIVING_HEADER,
+//    REACHED_EOL,
+//    REACHED_EOH
+//  } state = RECEIVING_HEADER;
+//  
+//  while (client.available()) {
+//    int c = client.read()
+//    if (c == '\n') {
+//      switch (state) {
+//        case RECEIVING_HEADER:
+//          state = REACHED_EOL;
+//          break;
+//        case REACHED_EOL:
+//          state = REACHED_EOF;
+//          break;
+//        case REACHED_EOF:
+//          break;
+//      }
 //    }
 //    
-//    if (!ether.dhcpSetup()){
-//      Serial.println("DHCP failed");
-//      continue;
-//    }
-//
-//    ether.printIp("IP:  ", ether.myip);
-//    ether.printIp("GW:  ", ether.gwip);  
-//    ether.printIp("DNS: ", ether.dnsip);  
-//
-//    if (!ether.dnsLookup(website)) {
-//      Serial.println("DNS failed");
-//      continue;
-//    } else {
-//      ether.printIp("SRV: ", ether.hisip);
-//  
-//      //reset init value
-//      res = 0;
-//      break;
-//    }    
 //  }
-//    Serial.print("RAM: ");
-//    Serial.println(freeRam()); 
-//}
+}
 
 int freeRam() {
   extern int __heap_start, *__brkval; 
