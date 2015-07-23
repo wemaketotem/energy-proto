@@ -23,7 +23,7 @@ const int kNetworkTimeout = 30*1000;
 const int kNetworkDelay = 1000;
 
 // P1 hardware configuration
-SoftwareSerial mySerial(rxPin, txPin, false); // RX, TX, inverted
+SoftwareSerial mySerial(rxPin, txPin, true); // RX, TX, inverted
 // P1 parsing variables
 String inputString = ""; // A string object that will contain one P1 message line
 String P181, P182, P281, P282, P170, P270, G; // The energy value strings cut from the P1 message
