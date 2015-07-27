@@ -5,8 +5,7 @@
 #include <SoftwareSerial.h>
 
 // Define all digital pins used
-#define requestPin  6  // P1 request line
-#define rxPin       7  // P1 UART RX
+#define rxPin       8  // P1 UART RX
 #define txPin       5  // Unused TX (is needed for SoftwareSerial)
 #define ledPin      13 // LED
 
@@ -43,8 +42,6 @@ void setup () {
 
   // Configure P1 port pinning
   mySerial.begin(9600);
-  pinMode(requestPin, OUTPUT);
-  digitalWrite(requestPin, HIGH);
   
   // Configure LED
   pinMode(ledPin, OUTPUT);
