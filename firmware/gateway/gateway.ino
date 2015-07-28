@@ -174,12 +174,12 @@ bool buildAndSendRequest(void) {
   url += P270;
   url += ",gas:";
   url += G;
-  url += "}";
   url += "}&apikey=" APIKEY;
 
   EthernetClient c;
   HttpClient http(c);
   err = http.get(HOST, url.c_str());
+//  err = http.get(HOST, "/input/post.json?json={181:345}&apikey=adc984f0efa3f9d6114b6677c6f08cd3");
   if (err == 0)
   {
     Serial.println("startedRequest ok");
