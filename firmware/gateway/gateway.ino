@@ -30,7 +30,7 @@ String P181, P182, P281, P282, P170, P270, G; // The energy value strings cut fr
 // Flags representing states TODO: Implement real state machine
 bool lineComplete = false; // Indicates that a line of a P1 message is received, need to check the line for value to parse
 bool msgComplete = false; // Indicates that a line of a P1 message is received, parse values can be send
-bool nextLineIsGas = false; // Indicates that the gas tag is found, its value is on the next line
+bool msgStarted = false; // Indicates that a P1 message is started being received
 
 
 void setup () {
@@ -58,6 +58,7 @@ void setup () {
 
 void loop () { 
   while (mySerial.available() && !(lineComplete || msgComplete)) {
+    msgStarted = true;
     int incomingByte = mySerial.read();
     incomingByte &= ~(1 << 7);    // forces 0th bit of x to be 0.  all other bits left alone.
     // add it to the inputString:
@@ -100,7 +101,7 @@ void loop () {
     lineComplete = false;     
   } else if (!mySerial.available()) {
     // When no line and no char available, wait a little to chill the processor
-    delay(50);
+//    delay(50); temporary disabled for v4 testing @115200 baud
   }
  
   if (msgComplete) {
@@ -128,12 +129,16 @@ void loop () {
     }
     
     // Message handled
+    msgStarted = false;
     msgComplete = false;
       
     Serial.print("RAM: ");
     Serial.println(freeRam()); 
   }
-  Ethernet.maintain();
+  
+  if (!msgStarted) { // Only do ethernet maintainance when not busy with receiving P1 message
+    Ethernet.maintain();
+  }
 }
 
 
