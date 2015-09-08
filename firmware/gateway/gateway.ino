@@ -92,7 +92,7 @@ void loop () {
       } else if (tag == "1-0:2.7.0") {
         P270 = inputString.substring(10, 10+2+1+3);
       } else if (tag == "0-1:24.2.1") {
-        G = inputString.substring(1, 24+5+1+3);
+        G = inputString.substring(1, 26+5+1+3);
       }
     }
      
