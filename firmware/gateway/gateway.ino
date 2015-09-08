@@ -14,8 +14,8 @@
 static byte mymac[] = { 0x74,0x69,0x69,0x2D,0x30,0x31 }; // ethernet interface mac address, must be unique on the LAN
 #define HOST "emoncms.org"
 //#define HOST "192.168.2.3"
-#define APIKEY "adc984f0efa3f9d6114b6677c6f08cd3" // Robert
-//#define APIKEY "121ac49b2af30c3c1bd82110dd877c52" // Marten
+//#define APIKEY "adc984f0efa3f9d6114b6677c6f08cd3" // Robert
+#define APIKEY "121ac49b2af30c3c1bd82110dd877c52" // Marten
 
 // Number of milliseconds to wait without receiving any data before we give up
 const int kNetworkTimeout = 30*1000;
@@ -42,7 +42,7 @@ void setup () {
   initialize_ethernet();
 
   // Configure P1 port pinning
-  mySerial.begin(9600);
+  mySerial.begin(115200);
   
   // Configure LED
   pinMode(ledPin, OUTPUT);
@@ -73,34 +73,25 @@ void loop () {
     }
   }
   if (lineComplete) {
-    if (nextLineIsGas) {
-      Serial.println("Found gas value");
-      Serial.print("inputString: ");
-      Serial.println(inputString);
-      G = inputString.substring(1, 1+5+1+3);
-      nextLineIsGas = false;
-    } else if (inputString.length() >= 9) { // Only handle lines larger than 9 chars
+    if (inputString.length() >= 9) { // Only handle lines larger than 9 chars
       String tag = inputString.substring(0, 9);
       Serial.print("inputString: ");
       Serial.println(inputString);
       if (tag == "1-0:1.8.1") {
         digitalWrite(ledPin, LOW); // Set LED to indicate receiving P1 message started (first tag of P1 message is received)
-        P181 = inputString.substring(10, 10+5+1+3);
+        P181 = inputString.substring(10, 10+6+1+3);
       } else if (tag == "1-0:1.8.2") {
-        P182 = inputString.substring(10, 10+5+1+3);
+        P182 = inputString.substring(10, 10+6+1+3);
       } else if (tag == "1-0:2.8.1") {
-        P281 = inputString.substring(10, 10+5+1+3);
+        P281 = inputString.substring(10, 10+6+1+3);
       } else if (tag == "1-0:2.8.2") {
-        P282 = inputString.substring(10, 10+5+1+3);
+        P282 = inputString.substring(10, 10+6+1+3);
       } else if (tag == "1-0:1.7.0") {
-        P170 = inputString.substring(10, 10+4+1+2);
+        P170 = inputString.substring(10, 10+2+1+3);
       } else if (tag == "1-0:2.7.0") {
-        P270 = inputString.substring(10, 10+4+1+2);
-      } else {
-        if (inputString.indexOf("(m3)") > 0) {
-          nextLineIsGas = true;
-          Serial.println("Found gas tag");
-        }
+        P270 = inputString.substring(10, 10+2+1+3);
+      } else if (tag == "0-1:24.2.1") {
+        G = inputString.substring(1, 24+5+1+3);
       }
     }
      
