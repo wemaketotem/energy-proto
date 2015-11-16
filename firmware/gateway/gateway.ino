@@ -3,12 +3,9 @@
 //#include <Ethernet.h> // To be used with W5100 Ethernet Shield from .CC (using Arduino IDE 1.6.5 from .cc)
 #include <Ethernet2.h> // To be used with W5500 Ethernet 2 Shield from .org (using Ardiono IDE 1.7.6 from .org)
 #include <EthernetClient.h>
-//#include <SoftwareSerial.h>
 #include <ArduinoJson.h>
 
 // Define all digital pins used
-//#define rxPin       8  // P1 UART RX
-//#define txPin       5  // Unused TX (is needed for SoftwareSerial)
 #define ledPin      13 // LED
 
 // Ethernet configuration constants, change these settings to match your own setup
@@ -23,8 +20,6 @@ const int kNetworkTimeout = 30*1000;
 // Number of milliseconds to wait if no data is available before trying again
 const int kNetworkDelay = 1000;
 
-// P1 hardware configuration
-//SoftwareSerial mySerial(rxPin, txPin, true); // RX, TX, inverted
 // P1 parsing variables
 String inputString = ""; // A string object that will contain one P1 message line
 String P181, P182, P281, P282, P170, P270, G; // The energy value strings cut from the P1 message
@@ -40,11 +35,8 @@ void setup () {
   Serial.println("\n[EmonCMS example]");
 
   // Initialize ethernet, it is blocking until it receives a DHCP lease
-  //initialize_ethernet();
+  initialize_ethernet();
 
-  // Configure P1 port pinning
-//  mySerial.begin(115200);
-  
   // Configure LED
   pinMode(ledPin, OUTPUT);
   // Let LED pulse 10 times on 10Hz at boot
@@ -124,10 +116,10 @@ void loop () {
     Serial.print("RAM: ");
     Serial.println(freeRam()); 
 
-    //if (!buildAndSendRequest()) {
+    if (!buildAndSendRequest()) {
       // Failed to send, re-initialize ethernet
-      //initialize_ethernet();
-    //}
+      initialize_ethernet();
+    }
     
     // Message handled
     msgStarted = false;
@@ -138,7 +130,7 @@ void loop () {
   }
   
   if (!msgStarted) { // Only do ethernet maintainance when not busy with receiving P1 message
-    //Ethernet.maintain();
+    Ethernet.maintain();
   }
 }
 
