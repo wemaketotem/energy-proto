@@ -3,11 +3,12 @@
 //#include <Ethernet.h> // To be used with W5100 Ethernet Shield from .CC (using Arduino IDE 1.6.5 from .cc)
 #include <Ethernet2.h> // To be used with W5500 Ethernet 2 Shield from .org (using Ardiono IDE 1.7.6 from .org)
 #include <EthernetClient.h>
-#include <SoftwareSerial.h>
+//#include <SoftwareSerial.h>
+#include <ArduinoJson.h>
 
 // Define all digital pins used
-#define rxPin       8  // P1 UART RX
-#define txPin       5  // Unused TX (is needed for SoftwareSerial)
+//#define rxPin       8  // P1 UART RX
+//#define txPin       5  // Unused TX (is needed for SoftwareSerial)
 #define ledPin      13 // LED
 
 // Ethernet configuration constants, change these settings to match your own setup
@@ -23,7 +24,7 @@ const int kNetworkTimeout = 30*1000;
 const int kNetworkDelay = 1000;
 
 // P1 hardware configuration
-SoftwareSerial mySerial(rxPin, txPin, true); // RX, TX, inverted
+//SoftwareSerial mySerial(rxPin, txPin, true); // RX, TX, inverted
 // P1 parsing variables
 String inputString = ""; // A string object that will contain one P1 message line
 String P181, P182, P281, P282, P170, P270, G; // The energy value strings cut from the P1 message
@@ -35,14 +36,14 @@ bool msgStarted = false; // Indicates that a P1 message is started being receive
 
 void setup () {
   // Configure debug serial output
-  Serial.begin(57600);
+  Serial.begin(115200);
   Serial.println("\n[EmonCMS example]");
 
   // Initialize ethernet, it is blocking until it receives a DHCP lease
-  initialize_ethernet();
+  //initialize_ethernet();
 
   // Configure P1 port pinning
-  mySerial.begin(115200);
+//  mySerial.begin(115200);
   
   // Configure LED
   pinMode(ledPin, OUTPUT);
@@ -57,9 +58,9 @@ void setup () {
 
 
 void loop () { 
-  while (mySerial.available() && !(lineComplete || msgComplete)) {
+  while (Serial.available() && !(lineComplete || msgComplete)) {
     msgStarted = true;
-    int incomingByte = mySerial.read();
+    int incomingByte = Serial.read();
     incomingByte &= ~(1 << 7);    // forces 0th bit of x to be 0.  all other bits left alone.
     // add it to the inputString:
     inputString += (char)incomingByte;
@@ -99,7 +100,7 @@ void loop () {
     // Line handled, reset for next line
     inputString = "";
     lineComplete = false;     
-  } else if (!mySerial.available()) {
+  } else if (!Serial.available()) {
     // When no line and no char available, wait a little to chill the processor
 //    delay(50); temporary disabled for v4 testing @115200 baud
   }
@@ -123,10 +124,10 @@ void loop () {
     Serial.print("RAM: ");
     Serial.println(freeRam()); 
 
-    if (!buildAndSendRequest()) {
+    //if (!buildAndSendRequest()) {
       // Failed to send, re-initialize ethernet
-      initialize_ethernet();
-    }
+      //initialize_ethernet();
+    //}
     
     // Message handled
     msgStarted = false;
@@ -137,7 +138,7 @@ void loop () {
   }
   
   if (!msgStarted) { // Only do ethernet maintainance when not busy with receiving P1 message
-    Ethernet.maintain();
+    //Ethernet.maintain();
   }
 }
 
