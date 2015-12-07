@@ -69,8 +69,6 @@ void loop () {
   if (lineComplete) {
     if (inputString.length() >= 9) { // Only handle lines larger than 9 chars
       String tag = inputString.substring(0, 9);
-      Serial.print("inputString: ");
-      Serial.println(inputString);
       if (tag == "1-0:1.8.1") {
         digitalWrite(ledPin, LOW); // Set LED to indicate receiving P1 message started (first tag of P1 message is received)
         P181 = inputString.substring(10, 10+6+1+3);
@@ -88,7 +86,7 @@ void loop () {
         G = inputString.substring(26, 26+5+1+3);
       }
     }
-     
+    
     // Line handled, reset for next line
     inputString = "";
     lineComplete = false;     
