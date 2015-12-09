@@ -117,7 +117,16 @@ void loop () {
     if (!buildAndSendRequest()) {
       // Failed to send, re-initialize ethernet
       initialize_ethernet();
+    } else {
+      P181 = "";    
+      P182 = "";    
+      P281 = "";    
+      P282 = "";    
+      P170 = "";    
+      P270 = "";    
+      G = "";    
     }
+    
     
     // Message handled
     msgStarted = false;
