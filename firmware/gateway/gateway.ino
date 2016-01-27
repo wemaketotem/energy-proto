@@ -1,7 +1,23 @@
+/************************************************************************
+ * 
+ * Instructions on configuring this code for your smart meter, Arduino 
+ * set-up and EmonCMS account.
+ * 
+ * 1. Comment/uncomment the proper Ethernet library, depending on which
+ * ethernet shield you have.
+ * 2. Add your API key, comment out the other one(s).
+ * 3. Set for DSMR2.2 or DSMR4+: TODO add instructions
+ * 
+ * 
+ * NOTE! When flashing the firmware, make sure to temporarily remove the 
+ * RX connector (0 pin) from your custom soldered RJ11 connection board!;) 
+ * 
+ ************************************************************************/
+
 #include <SPI.h>
 #include <HttpClient.h>
-//#include <Ethernet.h> // To be used with W5100 Ethernet Shield from .CC (using Arduino IDE 1.6.5 from .cc)
-#include <Ethernet2.h> // To be used with W5500 Ethernet 2 Shield from .org (using Ardiono IDE 1.7.6 from .org)
+#include <Ethernet.h> // To be used with W5100 Ethernet Shield from .CC (using Arduino IDE 1.6.5 from .cc)
+//#include <Ethernet2.h> // To be used with W5500 Ethernet 2 Shield from .org (using Ardiono IDE 1.7.6 from .org)
 #include <EthernetClient.h>
 //#include <ArduinoJson.h>
 
@@ -13,7 +29,8 @@ static byte mymac[] = { 0x74,0x69,0x69,0x2D,0x30,0x31 }; // ethernet interface m
 #define HOST "emoncms.org"
 //#define HOST "192.168.2.3"
 //#define APIKEY "adc984f0efa3f9d6114b6677c6f08cd3" // Robert
-#define APIKEY "121ac49b2af30c3c1bd82110dd877c52" // Marten
+//#define APIKEY "121ac49b2af30c3c1bd82110dd877c52" // Marten
+#define APIKEY "d910acc43636b34fb1147df410460164" // Diderik
 
 // Number of milliseconds to wait without receiving any data before we give up
 const int kNetworkTimeout = 30*1000;
