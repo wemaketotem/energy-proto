@@ -13,7 +13,9 @@ static byte mymac[] = { 0x74,0x69,0x69,0x2D,0x30,0x31 }; // ethernet interface m
 #define HOST "emoncms.org"
 //#define HOST "192.168.2.3"
 //#define APIKEY "adc984f0efa3f9d6114b6677c6f08cd3" // Robert
-#define APIKEY "121ac49b2af30c3c1bd82110dd877c52" // Marten
+//#define APIKEY "121ac49b2af30c3c1bd82110dd877c52" // Marten
+#define APIKEY "d910acc43636b34fb1147df410460164" // Diderik
+
 
 // Number of milliseconds to wait without receiving any data before we give up
 const int kNetworkTimeout = 30*1000;
@@ -27,11 +29,12 @@ String P181, P182, P281, P282, P170, P270, G; // The energy value strings cut fr
 bool lineComplete = false; // Indicates that a line of a P1 message is received, need to check the line for value to parse
 bool msgComplete = false; // Indicates that a line of a P1 message is received, parse values can be send
 bool msgStarted = false; // Indicates that a P1 message is started being received
-
+bool nextLineIsGas = false; // Indicates that next line contains the gas data (for DSMR v2.2 only)
 
 void setup () {
   // Configure debug serial output
-  Serial.begin(115200);
+  Serial.begin(9600); // for v2.2
+//  Serial.begin(115200); // for v4
   Serial.println("\n[EmonCMS example]");
 
   // Initialize ethernet, it is blocking until it receives a DHCP lease
@@ -67,25 +70,59 @@ void loop () {
     }
   }
   if (lineComplete) {
-    if (inputString.length() >= 9) { // Only handle lines larger than 9 chars
+    // Uncomment the version use want to use
+    // = begin v2.2 ==========================================
+    if (nextLineIsGas) {
+      Serial.println("Found gas value");
+      Serial.print("inputString: ");
+      Serial.println(inputString);
+      G = inputString.substring(1, 1+5+1+3);
+      nextLineIsGas = false;
+    } else if (inputString.length() >= 9) { // Only handle lines larger than 9 chars
       String tag = inputString.substring(0, 9);
       if (tag == "1-0:1.8.1") {
         digitalWrite(ledPin, LOW); // Set LED to indicate receiving P1 message started (first tag of P1 message is received)
-        P181 = inputString.substring(10, 10+6+1+3);
+        P181 = inputString.substring(10, 10+5+1+3);
       } else if (tag == "1-0:1.8.2") {
-        P182 = inputString.substring(10, 10+6+1+3);
+        P182 = inputString.substring(10, 10+5+1+3);
       } else if (tag == "1-0:2.8.1") {
-        P281 = inputString.substring(10, 10+6+1+3);
+        P281 = inputString.substring(10, 10+5+1+3);
       } else if (tag == "1-0:2.8.2") {
-        P282 = inputString.substring(10, 10+6+1+3);
+        P282 = inputString.substring(10, 10+5+1+3);
       } else if (tag == "1-0:1.7.0") {
-        P170 = inputString.substring(10, 10+2+1+3);
+        P170 = inputString.substring(10, 10+4+1+2);
       } else if (tag == "1-0:2.7.0") {
-        P270 = inputString.substring(10, 10+2+1+3);
-      } else if (tag == "0-1:24.2.") {
-        G = inputString.substring(26, 26+5+1+3);
+        P270 = inputString.substring(10, 10+4+1+2);
+      } else {
+        if (inputString.indexOf("(m3)") > 0) {
+          nextLineIsGas = true;
+          Serial.println("Found gas tag");
+        }
       }
     }
+    // = end v2.2 ==========================================
+    // = begin v4 ==========================================
+//    if (inputString.length() >= 9) { // Only handle lines larger than 9 chars
+//      String tag = inputString.substring(0, 9);
+//      if (tag == "1-0:1.8.1") {
+//        digitalWrite(ledPin, LOW); // Set LED to indicate receiving P1 message started (first tag of P1 message is received)
+//        P181 = inputString.substring(10, 10+6+1+3);
+//      } else if (tag == "1-0:1.8.2") {
+//        P182 = inputString.substring(10, 10+6+1+3);
+//      } else if (tag == "1-0:2.8.1") {
+//        P281 = inputString.substring(10, 10+6+1+3);
+//      } else if (tag == "1-0:2.8.2") {
+//        P282 = inputString.substring(10, 10+6+1+3);
+//      } else if (tag == "1-0:1.7.0") {
+//        P170 = inputString.substring(10, 10+2+1+3);
+//      } else if (tag == "1-0:2.7.0") {
+//        P270 = inputString.substring(10, 10+2+1+3);
+//      } else if (tag == "0-1:24.2.") {
+//        G = inputString.substring(26, 26+5+1+3);
+//      }
+//    }
+    // = end v4 ==========================================
+
     
     // Line handled, reset for next line
     inputString = "";
