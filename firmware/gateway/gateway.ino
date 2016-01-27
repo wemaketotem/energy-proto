@@ -3,7 +3,7 @@
 //#include <Ethernet.h> // To be used with W5100 Ethernet Shield from .CC (using Arduino IDE 1.6.5 from .cc)
 #include <Ethernet2.h> // To be used with W5500 Ethernet 2 Shield from .org (using Ardiono IDE 1.7.6 from .org)
 #include <EthernetClient.h>
-#include <ArduinoJson.h>
+//#include <ArduinoJson.h>
 
 // Define all digital pins used
 #define ledPin      13 // LED
