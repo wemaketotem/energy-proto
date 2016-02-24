@@ -1,23 +1,7 @@
-/************************************************************************
- * 
- * Instructions on configuring this code for your smart meter, Arduino 
- * set-up and EmonCMS account.
- * 
- * 1. Comment/uncomment the proper Ethernet library, depending on which
- * ethernet shield you have.
- * 2. Add your API key, comment out the other one(s).
- * 3. Set for DSMR2.2 or DSMR4+: TODO add instructions
- * 
- * 
- * NOTE! When flashing the firmware, make sure to temporarily remove the 
- * RX connector (0 pin) from your custom soldered RJ11 connection board!;) 
- * 
- ************************************************************************/
-
 #include <SPI.h>
 #include <HttpClient.h>
-#include <Ethernet.h> // To be used with W5100 Ethernet Shield from .CC (using Arduino IDE 1.6.5 from .cc)
-//#include <Ethernet2.h> // To be used with W5500 Ethernet 2 Shield from .org (using Ardiono IDE 1.7.6 from .org)
+//#include <Ethernet.h> // To be used with W5100 Ethernet Shield from .CC (using Arduino IDE 1.6.5 from .cc)
+#include <Ethernet2.h> // To be used with W5500 Ethernet 2 Shield from .org (using Ardiono IDE 1.7.6 from .org)
 #include <EthernetClient.h>
 //#include <ArduinoJson.h>
 
@@ -28,9 +12,8 @@
 static byte mymac[] = { 0x74,0x69,0x69,0x2D,0x30,0x31 }; // ethernet interface mac address, must be unique on the LAN
 #define HOST "emoncms.org"
 //#define HOST "192.168.2.3"
-//#define APIKEY "adc984f0efa3f9d6114b6677c6f08cd3" // Robert
+#define APIKEY "adc984f0efa3f9d6114b6677c6f08cd3" // Robert
 //#define APIKEY "121ac49b2af30c3c1bd82110dd877c52" // Marten
-#define APIKEY "d910acc43636b34fb1147df410460164" // Diderik
 
 // Number of milliseconds to wait without receiving any data before we give up
 const int kNetworkTimeout = 30*1000;
@@ -49,7 +32,8 @@ bool msgStarted = false; // Indicates that a P1 message is started being receive
 void setup () {
   // Configure debug serial output
   Serial.begin(115200);
-  Serial.println("\n[EmonCMS example]");
+  
+  tolog(F("\n[EmonCMS example]"));
 
   // Initialize ethernet, it is blocking until it receives a DHCP lease
   initialize_ethernet();
@@ -106,30 +90,30 @@ void loop () {
     
     // Line handled, reset for next line
     inputString = "";
-    lineComplete = false;     
+    lineComplete = false; 
   } else if (!Serial.available()) {
     // When no line and no char available, wait a little to chill the processor
 //    delay(50); temporary disabled for v4 testing @115200 baud
   }
  
   if (msgComplete) {
-    Serial.print("181:");    
-    Serial.println(P181);    
-    Serial.print("182:");    
-    Serial.println(P182);    
-    Serial.print("281:");    
-    Serial.println(P281);    
-    Serial.print("282:");    
-    Serial.println(P282);    
-    Serial.print("170:");    
-    Serial.println(P170);    
-    Serial.print("270:");    
-    Serial.println(P270);    
-    Serial.print("gas:");    
-    Serial.println(G);    
+    tolog(F("181:"));    
+    tolog(P181);    
+    tolog(F("182:"));    
+    tolog(P182);    
+    tolog(F("281:"));    
+    tolog(P281);    
+    tolog(F("282:"));    
+    tolog(P282);    
+    tolog(F("170:"));    
+    tolog(P170);    
+    tolog(F("270:"));    
+    tolog(P270);    
+    tolog(F("gas:"));    
+    tolog(G);    
    
-    Serial.print("RAM: ");
-    Serial.println(freeRam()); 
+    tolog(F("RAM: "));
+    tolog(freeRam()); 
 
     if (!buildAndSendRequest()) {
       // Failed to send, re-initialize ethernet
@@ -149,8 +133,8 @@ void loop () {
     msgStarted = false;
     msgComplete = false;
       
-    Serial.print("RAM: ");
-    Serial.println(freeRam()); 
+    tolog(F("RAM: "));
+    tolog(freeRam()); 
   }
   
   if (!msgStarted) { // Only do ethernet maintainance when not busy with receiving P1 message
@@ -162,13 +146,13 @@ void loop () {
 void initialize_ethernet(void){  
   while (!Ethernet.begin(mymac)) {
     // failed to get a DHCP response, try to recover later
-    Serial.print("failed to get a DHCP response, try to recover after one second");
+    tolog(F("failed to get a DHCP response, try to recover after one second"));
     delay(1000);
   }
   
   // DHCP received, get DNS
-  Serial.print("Received IP from DHCP server:");
-  Serial.println(Ethernet.localIP());
+  tolog(F("Received IP from DHCP server:"));
+  tolog(Ethernet.localIP());
 }
 
 bool buildAndSendRequest(void) {
@@ -196,12 +180,12 @@ bool buildAndSendRequest(void) {
 //  err = http.get(HOST, "/input/post.json?json={181:345}&apikey=adc984f0efa3f9d6114b6677c6f08cd3");
   if (err == 0)
   {
-    Serial.println("startedRequest ok");
+    tolog(F("startedRequest ok"));
     err = http.responseStatusCode();
     if (err >= 0)
     {
-      Serial.print("Got status code: ");
-      Serial.println(err);
+      tolog(F("Got status code: "));
+      tolog(err);
       // Usually you'd check that the response code is 200 or a
       // similar "success" code (200-299) before carrying on,
       // but we'll print out whatever response we get
@@ -209,10 +193,10 @@ bool buildAndSendRequest(void) {
       if (err >= 0)
       {
         int bodyLen = http.contentLength();
-        Serial.print("Content length is: ");
-        Serial.println(bodyLen);
-        Serial.println();
-        Serial.println("Body returned follows:");
+        tolog(F("Content length is: "));
+        tolog(bodyLen);
+        tolog();
+        tolog(F("Body returned follows:"));
         // Now we've got to the body, so we can print it out
         unsigned long timeoutStart = millis();
         char c;
@@ -224,7 +208,7 @@ bool buildAndSendRequest(void) {
           {
             c = http.read();
             // Print out this character
-            Serial.print(c);
+            tolog(c);
             bodyLen--;
             // We read something, reset the timeout counter
             timeoutStart = millis();
@@ -236,24 +220,24 @@ bool buildAndSendRequest(void) {
             delay(kNetworkDelay);
           }
         }
-        Serial.println();
+        tolog();
       }
       else
       {
-        Serial.print("Failed to skip response headers: ");
-        Serial.println(err);
+        tolog(F("Failed to skip response headers: "));
+        tolog(err);
       }
     }
     else
     {
-      Serial.print("Getting response failed: ");
-      Serial.println(err);
+      tolog(F("Getting response failed: "));
+      tolog(err);
     }
   }
   else
   {
-    Serial.print("Connect failed: ");
-    Serial.println(err);
+    tolog(F("Connect failed: "));
+    tolog(err);
   }
 
   return err == 0;
