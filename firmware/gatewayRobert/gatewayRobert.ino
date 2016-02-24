@@ -3,7 +3,7 @@
 //#include <Ethernet.h> // To be used with W5100 Ethernet Shield from .CC (using Arduino IDE 1.6.5 from .cc)
 #include <Ethernet2.h> // To be used with W5500 Ethernet 2 Shield from .org (using Ardiono IDE 1.7.6 from .org)
 #include <EthernetClient.h>
-#include <ArduinoJson.h>
+//#include <ArduinoJson.h>
 
 // Define all digital pins used
 #define ledPin      13 // LED
@@ -33,7 +33,7 @@ void setup () {
   // Configure debug serial output
   Serial.begin(115200);
   
-  tolog("\n[EmonCMS example]");
+  tolog(F("\n[EmonCMS example]"));
 
   // Initialize ethernet, it is blocking until it receives a DHCP lease
   initialize_ethernet();
@@ -97,22 +97,22 @@ void loop () {
   }
  
   if (msgComplete) {
-    tolog("181:");    
+    tolog(F("181:"));    
     tolog(P181);    
-    tolog("182:");    
+    tolog(F("182:"));    
     tolog(P182);    
-    tolog("281:");    
+    tolog(F("281:"));    
     tolog(P281);    
-    tolog("282:");    
+    tolog(F("282:"));    
     tolog(P282);    
-    tolog("170:");    
+    tolog(F("170:"));    
     tolog(P170);    
-    tolog("270:");    
+    tolog(F("270:"));    
     tolog(P270);    
-    tolog("gas:");    
+    tolog(F("gas:"));    
     tolog(G);    
    
-    tolog("RAM: ");
+    tolog(F("RAM: "));
     tolog(freeRam()); 
 
     if (!buildAndSendRequest()) {
@@ -133,7 +133,7 @@ void loop () {
     msgStarted = false;
     msgComplete = false;
       
-    tolog("RAM: ");
+    tolog(F("RAM: "));
     tolog(freeRam()); 
   }
   
@@ -146,12 +146,12 @@ void loop () {
 void initialize_ethernet(void){  
   while (!Ethernet.begin(mymac)) {
     // failed to get a DHCP response, try to recover later
-    tolog("failed to get a DHCP response, try to recover after one second");
+    tolog(F("failed to get a DHCP response, try to recover after one second"));
     delay(1000);
   }
   
   // DHCP received, get DNS
-  tolog("Received IP from DHCP server:");
+  tolog(F("Received IP from DHCP server:"));
   tolog(Ethernet.localIP());
 }
 
@@ -180,11 +180,11 @@ bool buildAndSendRequest(void) {
 //  err = http.get(HOST, "/input/post.json?json={181:345}&apikey=adc984f0efa3f9d6114b6677c6f08cd3");
   if (err == 0)
   {
-    tolog("startedRequest ok");
+    tolog(F("startedRequest ok"));
     err = http.responseStatusCode();
     if (err >= 0)
     {
-      tolog("Got status code: ");
+      tolog(F("Got status code: "));
       tolog(err);
       // Usually you'd check that the response code is 200 or a
       // similar "success" code (200-299) before carrying on,
@@ -193,10 +193,10 @@ bool buildAndSendRequest(void) {
       if (err >= 0)
       {
         int bodyLen = http.contentLength();
-        tolog("Content length is: ");
+        tolog(F("Content length is: "));
         tolog(bodyLen);
         tolog();
-        tolog("Body returned follows:");
+        tolog(F("Body returned follows:"));
         // Now we've got to the body, so we can print it out
         unsigned long timeoutStart = millis();
         char c;
@@ -224,19 +224,19 @@ bool buildAndSendRequest(void) {
       }
       else
       {
-        tolog("Failed to skip response headers: ");
+        tolog(F("Failed to skip response headers: "));
         tolog(err);
       }
     }
     else
     {
-      tolog("Getting response failed: ");
+      tolog(F("Getting response failed: "));
       tolog(err);
     }
   }
   else
   {
-    tolog("Connect failed: ");
+    tolog(F("Connect failed: "));
     tolog(err);
   }
 

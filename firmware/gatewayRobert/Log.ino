@@ -9,11 +9,11 @@ void setupLog ()
 
   if (!SD.begin(4)) 
   {
-    Serial.println("initialization of the SD card failed!");
+    Serial.println(F("initialization of the SD card failed!"));
     return;
   }
   
-  Serial.println("initialization of the SDcard is done.");
+  Serial.println(F("initialization of the SDcard is done."));
   
 }
 
